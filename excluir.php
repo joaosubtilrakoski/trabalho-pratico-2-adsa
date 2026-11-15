@@ -17,35 +17,11 @@ Descritivo: Sistema CRUD para gerenciamento de uma locadora de carros
 require_once __DIR__ . "/../config/funcoes.php";
 
 $id = (int)($_GET["id"] ?? 0);
-$consulta = $conn->prepare("SELECT carro_id FROM locacoes WHERE id=?");
-$consulta->bind_param("i", $id);
-$consulta->execute();
-$locacao = $consulta->get_result()->fetch_assoc();
+$stmt = $conn->prepare("DELETE FROM carros WHERE id = ?");
+$stmt->bind_param("i", $id);
 
-if ($locacao) {
-    $conn->begin_transaction();
-    try {
-        $excluir = $conn->prepare("DELETE FROM locacoes WHERE id=?");
-        $excluir->bind_param("i", $id);
-        $excluir->execute();
-
-        // Libera o carro somente se ele não possuir outra locação ativa.
-        $verificar = $conn->prepare("SELECT COUNT(*) AS total FROM locacoes WHERE carro_id=? AND status='Ativa'");
-        $verificar->bind_param("i", $locacao["carro_id"]);
-        $verificar->execute();
-        $resultado = $verificar->get_result()->fetch_assoc();
-
-        if ((int)$resultado["total"] === 0) {
-            $liberar = $conn->prepare("UPDATE carros SET status='Disponível' WHERE id=?");
-            $liberar->bind_param("i", $locacao["carro_id"]);
-            $liberar->execute();
-        }
-
-        $conn->commit();
-    } catch (Throwable $erro) {
-        $conn->rollback();
-        die("Não foi possível excluir a locação.");
-    }
+if (!$stmt->execute()) {
+    die("Não foi possível excluir. Este carro pode estar vinculado a uma locação. <a href='index.php'>Voltar</a>");
 }
 
 header("Location: index.php");
